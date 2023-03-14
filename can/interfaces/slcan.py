@@ -65,6 +65,7 @@ class slcanBus(BusABC):
         sleep_after_open: float = _SLEEP_AFTER_SERIAL_OPEN,
         rtscts: bool = False,
         timeout: float = 0.001,
+        listen_only: bool = False,
         **kwargs: Any,
     ) -> None:
         """
@@ -85,10 +86,14 @@ class slcanBus(BusABC):
             turn hardware handshake (RTS/CTS) on and off
         :param timeout:
             Timeout for the serial or usb device in seconds (default 0.001)
+        :param listen_only:
+            open interface in listen mode with ``L`` command, otherwise ``O`` command is used
         :raise ValueError: if both ``bitrate`` and ``btr`` are set or the channel is invalid
         :raise CanInterfaceNotImplementedError: if the serial module is missing
         :raise CanInitializationError: if the underlying serial connection could not be established
         """
+        self.listen_only = listen_only
+        
         if serial is None:
             raise CanInterfaceNotImplementedError("The serial module is not installed")
 
@@ -185,7 +190,10 @@ class slcanBus(BusABC):
             self.serialPortOrig.reset_input_buffer()
 
     def open(self) -> None:
-        self._write("O")
+        if self.listen_only == True:
+            self._write("L")
+        else:
+            self._write("O")
 
     def close(self) -> None:
         self._write("C")
