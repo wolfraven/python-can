@@ -44,6 +44,9 @@ class BusABC(metaclass=ABCMeta):
     #: Log level for received messages
     RECV_LOGGING_LEVEL = 9
 
+    #: Keep track about occupaition by a notifier
+    _notifier: Any = None
+        
     @abstractmethod
     def __init__(
         self,
@@ -410,6 +413,37 @@ class BusABC(metaclass=ABCMeta):
         # nothing matched
         return False
 
+    @property
+    def notifier(self):
+        """
+        Return the current notifier
+        """
+        return self._notifier
+
+    def set_notifier(self, new_notifier, replace:bool=False) -> None:
+        """
+        Set the new notifier
+        
+        :raises ~can.exceptions.CanOperationError:
+            If the bus still occupied by an other notifier and replace flag is False.
+        """
+        if self._notifier == None:
+            self._notifier = new_notifier
+        else:
+            if replace == False:
+                raise CanOperationError("Bus still occupied by a notifier.")
+            else:
+                self.release_from_notifier()
+                self._notifier = new_notifier
+
+    def release_from_notifier(self):
+        """
+        Remove this bus from current notifier and release occupation
+        """
+        if self._notifier != None:
+            # Mypy prefers this over a hasattr(...) check
+            getattr(self._notifier, "remove_bus", lambda: None)(self)
+
     def flush_tx_buffer(self) -> None:
         """Discard every message that may be queued in the output buffer(s)."""
 
@@ -419,6 +453,7 @@ class BusABC(metaclass=ABCMeta):
         in shutting down a bus.
         """
         self.stop_all_periodic_tasks()
+        self.release_from_notifier()
 
     def __enter__(self):
         return self
