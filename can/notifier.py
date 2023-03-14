@@ -84,6 +84,28 @@ class Notifier:
             reader_thread.daemon = True
             reader_thread.start()
             self._readers.append(reader_thread)
+        bus.set_notifier(self)
+
+    def remove_bus(self, bus: BusABC, timeout: float = 5) -> None:
+        """Remove a bus from notification.
+
+        :param bus:
+            CAN bus instance.
+        """
+        if len(self._readers) == 1:
+            self.stop() # single bus, stop listeners too 
+            return
+
+        end_time = time.time() + timeout
+        for reader in self._readers:
+            if reader == bus:
+                if isinstance(reader, threading.Thread):
+                    now = time.time()
+                    if now < end_time:
+                        reader.join(end_time - now)
+                elif self._loop:
+                    # reader is a file descriptor
+                    self._loop.remove_reader(reader)
 
     def stop(self, timeout: float = 5) -> None:
         """Stop notifying Listeners when new :class:`~can.Message` objects arrive
